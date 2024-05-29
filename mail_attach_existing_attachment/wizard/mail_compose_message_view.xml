@@ -12,7 +12,7 @@
                     <field
                     name="object_attachment_ids"
                     widget="many2many_checkboxes"
-                    domain="[('res_model', '=', model), ('res_id', '=', res_id)]"
+                    domain="[]"
                     attrs="{'invisible': [('can_attach_attachment', '=', False)]}"
                 />
             </xpath>

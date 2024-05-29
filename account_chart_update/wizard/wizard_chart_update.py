@@ -54,7 +54,7 @@ class WizardUpdateChartsAccounts(models.TransientModel):
         compute="_compute_chart_template_ids",
         help="Includes all chart templates.",
     )
-    code_digits = fields.Integer(related="chart_template_id.code_digits")
+    # code_digits = fields.Integer(related="chart_template_id.code_digits")
     lang = fields.Selection(
         lambda self: self._get_lang_selection_options(),
         "Language",
