@@ -1409,7 +1409,7 @@ class WizardUpdateChartsAccountsTax(models.TransientModel):
         ],
         readonly=False,
     )
-    type_tax_use = fields.Selection(related="tax_id.type_tax_use", readonly=True)
+    # type_tax_use = fields.Selection(related="tax_id.type_tax_use", readonly=True)
     update_tax_id = fields.Many2one(
         comodel_name="account.tax",
         string="Tax to update",

@@ -248,7 +248,7 @@
                                 <tree decoration-danger="type=='updated'">
                                     <field name="tax_id" />
                                     <field name="update_tax_id" />
-                                    <field name="type_tax_use" />
+<!--                                    <field name="type_tax_use" />-->
                                     <field name="notes" />
                                     <field name="type" />
                                 </tree>
@@ -268,7 +268,7 @@
                                         </group>
                                         <group>
                                             <field name="update_chart_wizard_id" />
-                                            <field name="type_tax_use" />
+<!--                                            <field name="type_tax_use" />-->
                                             <field name="update_tax_id" />
                                         </group>
                                     </group>
