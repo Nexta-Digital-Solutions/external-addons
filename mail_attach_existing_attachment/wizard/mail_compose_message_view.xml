@@ -13,7 +13,7 @@
                     name="object_attachment_ids"
                     widget="many2many_checkboxes"
                     domain="[]"
-                    attrs="{'invisible': [('can_attach_attachment', '=', False)]}"
+                    invisible="can_attach_attachment = False"
                 />
             </xpath>
         </field>
