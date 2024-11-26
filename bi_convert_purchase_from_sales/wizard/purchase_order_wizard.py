@@ -53,7 +53,6 @@ class createpurchaseorder(models.TransientModel):
             'partner_id': self.partner_id.id,
             'date_order': str(self.date_order),
             'origin': sale_order_name,
-            'partner_ref': sale_order_name,
             'currency_id': currency_id
         })
         sale_order = self.env['sale.order'].browse(self._context.get('active_ids', []))
