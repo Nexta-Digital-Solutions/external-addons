@@ -27,6 +27,7 @@ class createpurchaseorder(models.TransientModel):
                 'product_uom': record.product_uom.id,
                 'order_id': record.order_id.id,
                 'name': record.name,
+                'partner_ref': '',
                 'product_qty': record.product_uom_qty,
                 'price_unit': record.price_unit,
                 'product_subtotal': record.price_subtotal,
