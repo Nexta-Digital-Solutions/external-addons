@@ -1,0 +1,3 @@
+[submodule "server-ux"]
+	path = server-ux
+	url = https://github.com/OCA/server-ux.git
