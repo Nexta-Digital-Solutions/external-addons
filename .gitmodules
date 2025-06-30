@@ -1,3 +1,8 @@
 [submodule "server-ux"]
 	path = server-ux
 	url = https://github.com/OCA/server-ux.git
+	version = 18.0
+[submodule "bank-payment"]
+	path = bank-payment
+	url = https://github.com/OCA/bank-payment.git
+	version = 18.0
