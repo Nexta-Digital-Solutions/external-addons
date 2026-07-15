@@ -20,12 +20,15 @@
 import json
 import re
 from email.utils import encode_rfc2231
+from typing import Any
 
 from werkzeug import urls
+from werkzeug.wrappers import Response
 
 from odoo import http
-from odoo.http import request
-from odoo.tools.safe_eval import safe_eval, time
+from odoo.http import request, route
+from odoo.tools.safe_eval import safe_eval
+from odoo.tools.safe_eval import time as safe_time
 
 from odoo.addons.web.controllers.report import ReportController
 
@@ -56,9 +59,7 @@ class CxReportController(ReportController):
             # first part to get the variable name
             if "." in expr:
                 expr = expr.split(".")[0]
-            # Ignore expressions that are not variable names
-            # (don't start with letter) or in ignore list
-            if expr in ignore_expr or not expr[0].isaplha():
+            if expr in ignore_expr:
                 continue
             extra_ctx[expr] = "report"
         return extra_ctx
@@ -74,33 +75,29 @@ class CxReportController(ReportController):
         Returns:
             Char: composed name of the report
         """
-        report_name = "report"
         if docids:
             records = request.env[report.model].browse(docids)
             record_count = len(docids)
-            print_report_name = report.sudo().print_report_name
-            if record_count == 1 and print_report_name:
-                # Single record with formattable name
-                extra_ctx = self._get_extra_context_for_single_record(
-                    print_report_name,
-                    ignore_expr=["object", "time"],
-                )
-                report_name = safe_eval(
-                    print_report_name,
-                    {
-                        "object": records,
-                        "time": time,
-                        **extra_ctx,
-                    },
-                )
+            if record_count == 1 and report.sudo().print_report_name:
+                try:
+                    print_report_name = report.sudo().print_report_name
+                    extra_ctx = self._get_extra_context_for_single_record(
+                        print_report_name,
+                        ignore_expr=["object", "time"],
+                    )
+
+                    report_name = safe_eval(
+                        print_report_name,
+                        {
+                            "object": records,
+                            "time": safe_time,
+                            **extra_ctx,
+                        },
+                    )
+                except Exception:
+                    report_name = f"{report.name}_report"
             else:
-                # Multiple records
-                # or single record report without formattable name
-                report_name = (
-                    f"{report.name} x{record_count}"
-                    if record_count > 1
-                    else report.name
-                )
+                report_name = f"{report.name} x{record_count}"
         else:
             report_name = report.name
         return report_name
@@ -108,7 +105,7 @@ class CxReportController(ReportController):
     # ------------------------------------------------------
     # Report controllers
     # ------------------------------------------------------
-    @http.route(
+    @route(
         [
             "/report/<converter>/<reportname>",
             "/report/<converter>/<reportname>/<docids>",
@@ -117,57 +114,75 @@ class CxReportController(ReportController):
         auth="user",
         website=True,
     )
-    def report_routes(self, reportname, docids=None, converter=None, **data):
+    def report_routes(
+        self,
+        reportname: str,
+        docids: str | None = None,
+        converter: str | None = None,
+        **data: dict[str, Any],
+    ) -> Response:
+        """Handle report routes with browser preview for PDFs."""
         if converter != "pdf":
             return super().report_routes(
                 reportname, docids=docids, converter=converter, **data
             )
 
-        report_obj = request.env["ir.actions.report"]
-        report = report_obj._get_report_from_name(reportname)
+        report = request.env["ir.actions.report"]._get_report_from_name(reportname)
+        if not report:
+            return request.not_found()
+
         context = dict(request.env.context)
 
-        # Options
+        # Handle options and context
         if data.get("options"):
-            data_options = data.pop("options")
-            data.update(json.loads(urls.url_unquote_plus(data_options)))
+            options_str = data.pop("options")
+            if isinstance(options_str, str):
+                data.update(json.loads(urls.url_unquote_plus(options_str)))
 
-        # Context
-        data_context = data.get("context")
-        if data_context:
-            context.update(json.loads(urls.url_unquote_plus(data_context)))
+        if data.get("context"):
+            context_str = data.get("context")
+            if isinstance(context_str, str):
+                context.update(json.loads(urls.url_unquote_plus(context_str)))
 
-        # Set allowed companies if provided explicitly
-        if data.get("cid"):
-            allowed_company_ids = [int(i) for i in data.get("cid").split(",")]
-            context.update(allowed_company_ids=allowed_company_ids)
+        # Handle company context
+        cid = data.get("cid")
+        if cid:
+            try:
+                allowed_company_ids = [int(cid) for cid in cid.split(",")]
+                context["allowed_company_ids"] = allowed_company_ids
+            except (ValueError, AttributeError):
+                return request.not_found()
 
-        # Update request context
-        request.env.context = context
+        request.update_env(context=context)
 
-        # Doc IDs
+        # Handle document IDs
+        doc_ids: list[int] = []
         if docids:
-            docids = [int(i) for i in docids.split(",")]
+            try:
+                doc_ids = [int(i) for i in docids.split(",")]
+                records = request.env[report.model].browse(doc_ids)
+                records.check_access("read")
+            except (ValueError, AttributeError):
+                return request.not_found()
 
-            # Ensure user has access to the documents
-            records = request.env[report.model].browse(docids)
-            records.check_access_rule("read")
-
-        report_file_name = self._compose_report_file_name(docids, report)
-        pdf = report_obj.with_context(**context)._render_qweb_pdf(
-            reportname, docids, data=data
+        report_name = self._compose_report_file_name(doc_ids, report)
+        pdf = report.with_context(**context)._render_qweb_pdf(
+            reportname, doc_ids, data=data
         )[0]
+
         return request.make_response(
             pdf,
             headers=[
                 ("Content-Type", "application/pdf"),
-                ("Content-Length", len(pdf)),
+                ("Content-Length", str(len(pdf))),
                 (
                     "Content-Disposition",
-                    (
-                        "inline; filename*=%s.pdf"
-                        % encode_rfc2231(report_file_name, "utf-8")
-                    ),
+                    f'inline; filename="{report_name}.pdf"; '
+                    f"filename*={encode_rfc2231(report_name, 'utf-8')}.pdf",
                 ),
             ],
         )
+
+    @http.route("/report/check_wkhtmltopdf", type="jsonrpc", auth="user")
+    def check_wkhtmltopdf(self):
+        return request.env["ir.actions.report"].get_wkhtmltopdf_state()
